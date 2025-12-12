@@ -1,0 +1,124 @@
+use crate::hittable::*;
+use crate::ray::*;
+use crate::vec3::*;
+
+use rand::prelude::*;
+
+use std::fs::File;
+use std::io::Write;
+use std::io::{self, BufWriter};
+use std::path::Path;
+
+pub struct Camera {
+    image_height: i64,
+    image_width: i64,
+    center: Point3,
+    pixel00_loc: Point3,
+    pixel_delta_u: Vec3,
+    pixel_delta_v: Vec3,
+    aspect_ratio: f64,
+    samples_per_pixel: i32,
+    out_file: BufWriter<File>,
+}
+
+impl Camera {
+    pub fn new<P>(aspect_ratio: f64, image_width: i64, filename: P) -> Result<Camera, io::Error>
+    where
+        P: AsRef<Path>,
+    {
+        let image_height: i64 = {
+            let x = image_width as f64 / aspect_ratio;
+            if x < 1.0 {
+                1
+            } else {
+                x as i64
+            }
+        };
+
+        let viewport_height: f64 = 100.0;
+        let viewport_width: f64 = viewport_height * (image_width as f64 / image_height as f64);
+
+        let focal_length: f64 = 50.0;
+        let center: Point3 = Point3::new(0.0, 0.0, 0.0);
+
+        let viewport_u = Vec3::new(viewport_width, 0.0, 0.0);
+        let viewport_v = Vec3::new(0.0, -viewport_height, 0.0);
+
+        let pixel_delta_u = viewport_u / image_width as f64;
+        let pixel_delta_v = viewport_v / image_height as f64;
+
+        let viewport_upper_left =
+            (center - Vec3::new(0.0, 0.0, focal_length)) - (viewport_u / 2.0) - (viewport_v / 2.0);
+        let pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
+
+        let samples_per_pixel = 10;
+        let file = File::create(filename)?;
+        let bufwriter = BufWriter::new(file);
+
+        Ok(Camera {
+            image_height,
+            image_width,
+            center,
+            pixel00_loc,
+            pixel_delta_u,
+            pixel_delta_v,
+            aspect_ratio,
+            samples_per_pixel,
+            out_file: bufwriter,
+        })
+    }
+
+    pub fn set_samples_per_pixel(&mut self, samples: i32) {
+        self.samples_per_pixel = samples;
+    }
+
+    pub fn render(&mut self, world: &HittableList) -> io::Result<()> {
+        write!(
+            self.out_file,
+            "P3\n{} {}\n255\n",
+            self.image_width, self.image_height
+        );
+
+        for j in 0..self.image_height {
+            for i in 0..self.image_width {
+                print!("Scanline: {i}, {j}");
+                let mut avg_colour = Colour::new(0.0, 0.0, 0.0);
+                for _ in 0..self.samples_per_pixel {
+                    let r = self.make_ray(i, j);
+                    avg_colour += self.ray_colour(&r, &world);
+                }
+                write!(self.out_file, "{}", avg_colour)?;
+            }
+        }
+
+        self.out_file.flush()
+    }
+
+    fn ray_colour(&self, ray: &Ray, world: &HittableList) -> Colour {
+        if let Some(record) = world.hit(ray, 0.0, f64::INFINITY) {
+            return Colour::from((record.normal() + Vec3::new(1.0, 1.0, 1.0)) * 0.5);
+        }
+
+        let direction = unit_vector(ray.direction());
+        let scale = 0.5 * (direction.y() + 1.0);
+        (1.0 - scale) * Colour::new(1.0, 1.0, 1.0) + scale * Colour::new(0.5, 0.7, 1.0)
+    }
+
+    fn sample_square(&self) -> Vec3 {
+        let mut rng = rand::rng();
+        Vec3::new(rng.random::<f64>() - 0.5, rng.random::<f64>() - 0.5, 0.0)
+    }
+
+    fn make_ray(&self, i: i64, j: i64) -> Ray {
+        let offset = self.sample_square();
+
+        let pixel_sample = self.pixel00_loc
+            + ((i as f64 + offset.x()) * self.pixel_delta_u)
+            + ((j as f64 + offset.y()) * self.pixel_delta_v);
+
+        let ray_origin = self.center;
+        let ray_direction = Vec3::from(pixel_sample - ray_origin);
+
+        Ray::new(ray_origin, ray_direction)
+    }
+}

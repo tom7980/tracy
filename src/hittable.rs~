@@ -1,0 +1,76 @@
+use crate::ray::*;
+use crate::vec3::*;
+
+#[derive(Clone, Default)]
+pub struct HitRecord {
+    p: Point3,
+    normal: Vec3,
+    t: f64,
+    front_face: bool,
+}
+
+impl HitRecord {
+    pub fn new() -> HitRecord {
+        Default::default()
+    }
+
+    pub fn update_record(&mut self, p: Point3, normal: Vec3, t: f64) {
+        self.p = p;
+        self.normal = normal;
+        self.t = t;
+    }
+
+    pub fn set_face_normal(&mut self, ray: &Ray, out_normal: Vec3) {
+        self.front_face = dot(ray.direction(), out_normal) < 0.0;
+        self.normal = if self.front_face {
+            out_normal
+        } else {
+            -out_normal
+        };
+    }
+
+    pub fn normal(&self) -> Vec3 {
+        return self.normal;
+    }
+}
+
+#[derive(Default)]
+pub struct HittableList {
+    hittables: Vec<Box<dyn Hittable>>,
+}
+
+impl HittableList {
+    pub fn new() -> HittableList {
+        Default::default()
+    }
+
+    pub fn add(&mut self, object: Box<dyn Hittable>) {
+        self.hittables.push(object);
+    }
+}
+
+impl Hittable for HittableList {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let mut record = HitRecord::new();
+        let mut hit = false;
+        let mut closest_so_far = t_max;
+
+        self.hittables.iter().for_each(|x| {
+            if let Some(last_record) = x.hit(ray, t_min, closest_so_far) {
+                record = last_record.clone();
+                hit = true;
+                closest_so_far = last_record.t
+            }
+        });
+
+        if hit {
+            Some(record)
+        } else {
+            None
+        }
+    }
+}
+
+pub trait Hittable {
+    fn hit(&self, r: &Ray, ray_tmin: f64, ray_tmax: f64) -> Option<HitRecord>;
+}
