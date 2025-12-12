@@ -1,17 +1,35 @@
+use crate::material;
+use crate::material::Material;
 use crate::ray::*;
 use crate::vec3::*;
+use std::sync::Arc;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct HitRecord {
     p: Point3,
     normal: Vec3,
     t: f64,
     front_face: bool,
+    material: Arc<dyn Material>,
 }
 
 impl HitRecord {
-    pub fn new() -> HitRecord {
-        Default::default()
+    pub fn new(p: Point3, normal: Vec3, t: f64, material: Arc<dyn Material>) -> HitRecord {
+        HitRecord {
+            p,
+            normal,
+            t,
+            front_face: false,
+            material,
+        }
+    }
+
+    pub fn material_ref(&self) -> &dyn Material {
+        self.material.as_ref()
+    }
+
+    pub fn front_face(&self) -> bool {
+        self.front_face
     }
 
     pub fn update_record(&mut self, p: Point3, normal: Vec3, t: f64) {
@@ -55,26 +73,19 @@ impl HittableList {
 
 impl Hittable for HittableList {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let mut record = HitRecord::new();
-        let mut hit = false;
+        let mut record = None;
         let mut closest_so_far = t_max;
 
         self.hittables.iter().for_each(|x| {
             if let Some(last_record) = x.hit(ray, t_min, closest_so_far) {
-                record = last_record.clone();
-                hit = true;
-                closest_so_far = last_record.t
+                closest_so_far = last_record.t;
+                record = Some(last_record);
             }
         });
-
-        if hit {
-            Some(record)
-        } else {
-            None
-        }
+        record
     }
 }
 
-pub trait Hittable {
+pub trait Hittable: Send + Sync {
     fn hit(&self, r: &Ray, ray_tmin: f64, ray_tmax: f64) -> Option<HitRecord>;
 }

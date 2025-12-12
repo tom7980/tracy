@@ -33,6 +33,22 @@ impl Vec3 {
         self.e[0] * self.e[0] + self.e[1] * self.e[1] + self.e[2] * self.e[2]
     }
 
+    pub fn near_zero(&self) -> bool {
+        let s = 1e-8;
+        (f64::abs(self.e[0]) < s) && (f64::abs(self.e[1]) < s) && (f64::abs(self.e[2]) < s)
+    }
+
+    pub fn reflect(&self, normal: &Vec3) -> Vec3 {
+        *self - 2.0 * dot(*self, *normal) * *normal
+    }
+
+    pub fn refract(&self, normal: &Vec3, etai_over_etat: f64) -> Vec3 {
+        let cos_theta = dot(-*self, *normal).min(1.0);
+        let r_out_perp = etai_over_etat * (*self + cos_theta * *normal);
+        let r_out_parallel = -f64::sqrt(f64::abs(1.0 - r_out_perp.length_squared())) * *normal;
+        r_out_parallel + r_out_perp
+    }
+
     pub fn random() -> Vec3 {
         let mut rng = rand::rng();
         Vec3 {
@@ -67,6 +83,20 @@ impl Vec3 {
             on_unit_sphere
         } else {
             -on_unit_sphere
+        }
+    }
+
+    pub fn random_in_unit_disk() -> Vec3 {
+        let mut rng = rand::rng();
+        loop {
+            let p = Vec3::new(
+                rng.random_range(-1.0..1.0),
+                rng.random_range(-1.0..1.0),
+                0.0,
+            );
+            if p.length_squared() < 1.0 {
+                return p;
+            }
         }
     }
 }
@@ -319,6 +349,14 @@ impl Mul<Colour> for f64 {
 
     fn mul(self, other: Colour) -> Colour {
         Colour::from(other.data * self)
+    }
+}
+
+impl Mul for Colour {
+    type Output = Colour;
+
+    fn mul(self, other: Colour) -> Colour {
+        Colour::from(self.data * other.data)
     }
 }
 

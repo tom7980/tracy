@@ -4,6 +4,7 @@ use crate::vec3::*;
 
 use indicatif::{MultiProgress, ProgressBar};
 use rand::prelude::*;
+use rayon::prelude::*;
 
 use std::fs::File;
 use std::io::Write;
@@ -22,10 +23,30 @@ pub struct Camera {
     sample_scale_factor: f64,
     out_file: BufWriter<File>,
     max_depth: u32,
+
+    vfov: f64,
+
+    u: Vec3,
+    v: Vec3,
+    w: Vec3,
+
+    defocus_disk_u: Vec3,
+    defocus_disk_v: Vec3,
+    focus_angle: f64,
 }
 
 impl Camera {
-    pub fn new<P>(aspect_ratio: f64, image_width: u64, filename: P) -> Result<Camera, io::Error>
+    pub fn new<P>(
+        aspect_ratio: f64,
+        image_width: u64,
+        vfov: f64,
+        center: Point3,
+        look_at: Point3,
+        up_vec: Vec3,
+        focus_distance: f64,
+        focus_angle: f64,
+        filename: P,
+    ) -> Result<Camera, io::Error>
     where
         P: AsRef<Path>,
     {
@@ -38,20 +59,25 @@ impl Camera {
             }
         };
 
-        let viewport_height: f64 = 2.0;
+        // Default to 90 degree FOV at first
+        let theta = vfov.to_radians();
+        let h = (theta / 2.0).tan();
+
+        let viewport_height: f64 = 2.0 * h * focus_distance;
         let viewport_width: f64 = viewport_height * (image_width as f64 / image_height as f64);
 
-        let focal_length: f64 = 1.0;
-        let center: Point3 = Point3::new(0.0, 0.0, 0.0);
+        let w = unit_vector(Vec3::from(center - look_at));
+        let u = unit_vector(cross(up_vec, w));
+        let v = cross(w, u);
 
-        let viewport_u = Vec3::new(viewport_width, 0.0, 0.0);
-        let viewport_v = Vec3::new(0.0, -viewport_height, 0.0);
+        let viewport_u = viewport_width * u;
+        let viewport_v = viewport_height * -v;
 
         let pixel_delta_u = viewport_u / image_width as f64;
         let pixel_delta_v = viewport_v / image_height as f64;
 
         let viewport_upper_left =
-            (center - Vec3::new(0.0, 0.0, focal_length)) - (viewport_u / 2.0) - (viewport_v / 2.0);
+            (center - (focus_distance * w)) - (viewport_u / 2.0) - (viewport_v / 2.0);
         let pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
         let samples_per_pixel = 10;
@@ -59,6 +85,9 @@ impl Camera {
         let file = File::create(filename)?;
         let bufwriter = BufWriter::new(file);
 
+        let defocus_radius = focus_distance * (focus_angle / 2.0).to_radians().tan();
+        let defocus_disk_u = u * defocus_radius;
+        let defocus_disk_v = v * defocus_radius;
         Ok(Camera {
             image_height,
             image_width,
@@ -71,6 +100,13 @@ impl Camera {
             sample_scale_factor,
             out_file: bufwriter,
             max_depth: 10,
+            vfov,
+            u,
+            v,
+            w,
+            defocus_disk_u,
+            defocus_disk_v,
+            focus_angle,
         })
     }
 
@@ -81,6 +117,11 @@ impl Camera {
 
     pub fn set_max_depth(&mut self, depth: u32) {
         self.max_depth = depth;
+    }
+
+    pub fn defocus_disk_sample(&self) -> Point3 {
+        let p = Vec3::random_in_unit_disk();
+        self.center + (p.x() * self.defocus_disk_u) + (p.y() * self.defocus_disk_v)
     }
 
     pub fn render(&mut self, world: &HittableList) -> io::Result<()> {
@@ -97,36 +138,26 @@ impl Camera {
         (0..self.image_height).for_each(|j| {
             bar_j.inc(1);
             let bar_i = mp.add(ProgressBar::new(self.image_width));
-            (0..self.image_width).for_each(|i| {
-                bar_i.inc(1);
-                let mut avg_colour = Colour::new(0.0, 0.0, 0.0);
-                (0..self.samples_per_pixel).for_each(|_| {
-                    let r = self.make_ray(i, j);
-                    avg_colour += self.ray_colour(&r, self.max_depth, &world);
-                });
+            let pixel_colours: Vec<_> = (0..self.image_width)
+                .into_par_iter()
+                .map(|i| {
+                    bar_i.inc(1);
+                    let mut avg_colour = Colour::new(0.0, 0.0, 0.0);
+                    (0..self.samples_per_pixel).for_each(|_| {
+                        let r = self.make_ray(i, j);
+                        avg_colour += self.ray_colour(&r, self.max_depth, &world);
+                    });
+                    avg_colour
+                })
+                .collect();
+            for pix in pixel_colours {
                 self.out_file
-                    .write_fmt(format_args!("{}", avg_colour * self.sample_scale_factor))
+                    .write_fmt(format_args!("{}", pix * self.sample_scale_factor))
                     .unwrap();
-            });
+            }
             bar_i.finish();
             mp.remove(&bar_i);
         });
-
-        // for j in 0..self.image_height {
-        //     bar_j.inc(1);
-        //     let bar_i = mp.add(ProgressBar::new(self.image_width));
-        //     for i in 0..self.image_width {
-        //         bar_i.inc(1);
-        //         let mut avg_colour = Colour::new(0.0, 0.0, 0.0);
-        //         for _ in 0..self.samples_per_pixel {
-        //             let r = self.make_ray(i, j);
-        //             avg_colour += self.ray_colour(&r, self.max_depth, &world);
-        //         }
-        //         write!(self.out_file, "{}", avg_colour * self.sample_scale_factor)?;
-        //     }
-        //     bar_i.finish();
-        //     mp.remove(&bar_i);
-        // }
 
         bar_j.finish();
         self.out_file.flush()
@@ -138,10 +169,10 @@ impl Camera {
         }
 
         if let Some(record) = world.hit(ray, 0.001, f64::INFINITY) {
-            let direction = record.normal() + Vec3::random_unit_vector();
-            return Colour::from(
-                self.ray_colour(&Ray::new(record.hit_pos(), direction), depth - 1, world) * 0.5,
-            );
+            if let Some(scatter) = record.material_ref().scatter(ray, &record) {
+                return Colour::from(self.ray_colour(scatter.scattered_ref(), depth - 1, world))
+                    * scatter.attenuation();
+            }
         }
 
         let direction = unit_vector(ray.direction());
@@ -161,7 +192,11 @@ impl Camera {
             + ((i as f64 + offset.x()) * self.pixel_delta_u)
             + ((j as f64 + offset.y()) * self.pixel_delta_v);
 
-        let ray_origin = self.center;
+        let ray_origin = if self.focus_angle <= 0.0 {
+            self.center
+        } else {
+            self.defocus_disk_sample()
+        };
         let ray_direction = Vec3::from(pixel_sample - ray_origin);
 
         Ray::new(ray_origin, ray_direction)
