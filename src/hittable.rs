@@ -1,26 +1,37 @@
+use crate::bounding::*;
 use crate::material;
 use crate::material::Material;
 use crate::ray::*;
 use crate::vec3::*;
 use std::sync::Arc;
 
-#[derive(Clone)]
 pub struct HitRecord {
     p: Point3,
     normal: Vec3,
-    t: f64,
+    pub t: f64,
     front_face: bool,
     material: Arc<dyn Material>,
+    pub u: f64,
+    pub v: f64,
 }
 
 impl HitRecord {
-    pub fn new(p: Point3, normal: Vec3, t: f64, material: Arc<dyn Material>) -> HitRecord {
+    pub fn new(
+        p: Point3,
+        normal: Vec3,
+        t: f64,
+        material: Arc<dyn Material>,
+        u: f64,
+        v: f64,
+    ) -> HitRecord {
         HitRecord {
             p,
             normal,
             t,
             front_face: false,
             material,
+            u,
+            v,
         }
     }
 
@@ -56,17 +67,22 @@ impl HitRecord {
     }
 }
 
-#[derive(Default)]
 pub struct HittableList {
     hittables: Vec<Box<dyn Hittable>>,
+    bounds: BoundingBox,
 }
 
 impl HittableList {
     pub fn new() -> HittableList {
-        Default::default()
+        HittableList {
+            hittables: Vec::new(),
+            bounds: BoundingBox::empty(),
+        }
     }
 
     pub fn add(&mut self, object: Box<dyn Hittable>) {
+        let bounds = BoundingBox::box_between(&self.bounds, object.bounding_box());
+        self.bounds = bounds;
         self.hittables.push(object);
     }
 }
@@ -84,8 +100,14 @@ impl Hittable for HittableList {
         });
         record
     }
+
+    fn bounding_box(&self) -> &BoundingBox {
+        &self.bounds
+    }
 }
 
 pub trait Hittable: Send + Sync {
     fn hit(&self, r: &Ray, ray_tmin: f64, ray_tmax: f64) -> Option<HitRecord>;
+
+    fn bounding_box(&self) -> &BoundingBox;
 }

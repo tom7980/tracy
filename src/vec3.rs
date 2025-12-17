@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub};
 
 use rand::Rng;
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Vec3 {
     e: [f64; 3],
 }
@@ -23,6 +23,10 @@ impl Vec3 {
 
     pub fn z(&self) -> f64 {
         self.e[2]
+    }
+
+    pub fn offset(&self, x: usize) -> f64 {
+        self.e[x]
     }
 
     pub fn length(&self) -> f64 {
@@ -98,6 +102,21 @@ impl Vec3 {
                 return p;
             }
         }
+    }
+}
+
+impl PartialOrd for Vec3 {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.e[0]
+            .partial_cmp(&other.e[0])
+            .and(self.e[1].partial_cmp(&other.e[1]))
+            .and(self.e[2].partial_cmp(&other.e[2]))
+    }
+}
+
+impl PartialEq for Vec3 {
+    fn eq(&self, other: &Self) -> bool {
+        self.e[0].eq(&other.e[0]) && self.e[1].eq(&other.e[1]) && self.e[2].eq(&other.e[2])
     }
 }
 
@@ -222,13 +241,73 @@ impl From<Point3> for Vec3 {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Point3 {
     data: Vec3,
 }
 
+impl PartialOrd for Point3 {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.data.partial_cmp(&other.data)
+    }
+}
+
+impl PartialEq for Point3 {
+    fn eq(&self, other: &Self) -> bool {
+        self.data.eq(&other.data)
+    }
+}
+
 impl Point3 {
     pub fn new(x: f64, y: f64, z: f64) -> Point3 {
+        Point3 {
+            data: Vec3::new(x, y, z),
+        }
+    }
+
+    pub fn offset(&self, i: usize) -> f64 {
+        self.data.offset(i)
+    }
+
+    pub fn most_minimum(&self, other: Point3) -> Point3 {
+        let x = if self.offset(0) <= other.offset(0) {
+            self.offset(0)
+        } else {
+            other.offset(0)
+        };
+        let y = if self.offset(1) <= other.offset(1) {
+            self.offset(1)
+        } else {
+            other.offset(1)
+        };
+        let z = if self.offset(2) <= other.offset(2) {
+            self.offset(2)
+        } else {
+            other.offset(2)
+        };
+
+        Point3 {
+            data: Vec3::new(x, y, z),
+        }
+    }
+
+    pub fn most_maximum(&self, other: Point3) -> Point3 {
+        let x = if self.offset(0) >= other.offset(0) {
+            self.offset(0)
+        } else {
+            other.offset(0)
+        };
+        let y = if self.offset(1) >= other.offset(1) {
+            self.offset(1)
+        } else {
+            other.offset(1)
+        };
+        let z = if self.offset(2) >= other.offset(2) {
+            self.offset(2)
+        } else {
+            other.offset(2)
+        };
+
         Point3 {
             data: Vec3::new(x, y, z),
         }

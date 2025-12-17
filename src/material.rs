@@ -1,5 +1,6 @@
-use crate::{hittable::*, ray::*, vec3::*};
+use crate::{hittable::*, ray::*, texture::*, vec3::*};
 use rand::Rng;
+use std::sync::Arc;
 
 pub struct ScatterRecord {
     attenuation: Colour,
@@ -25,11 +26,11 @@ pub trait Material: Send + Sync {
 }
 
 pub struct Lambertian {
-    albedo: Colour,
+    albedo: Arc<dyn Texture>,
 }
 
 impl Lambertian {
-    pub fn new(albedo: Colour) -> Lambertian {
+    pub fn new(albedo: Arc<dyn Texture>) -> Lambertian {
         Lambertian { albedo }
     }
 }
@@ -41,8 +42,10 @@ impl Material for Lambertian {
             scatter_direction = hit_record.normal();
         }
         Some(ScatterRecord {
-            attenuation: self.albedo,
-            scattered: Ray::new(hit_record.hit_pos(), scatter_direction),
+            attenuation: self
+                .albedo
+                .value(hit_record.u, hit_record.v, hit_record.hit_pos()),
+            scattered: Ray::new(hit_record.hit_pos(), scatter_direction, ray.time()),
         })
     }
 }
@@ -68,7 +71,7 @@ impl Material for Metalic {
 
         Some(ScatterRecord {
             attenuation: self.albedo,
-            scattered: Ray::new(hit_record.hit_pos(), reflected),
+            scattered: Ray::new(hit_record.hit_pos(), reflected, ray.time()),
         })
     }
 }
@@ -117,7 +120,7 @@ impl Material for Dielectric {
 
         Some(ScatterRecord {
             attenuation: self.albedo,
-            scattered: Ray::new(hit_record.hit_pos(), direction),
+            scattered: Ray::new(hit_record.hit_pos(), direction, ray.time()),
         })
     }
 }

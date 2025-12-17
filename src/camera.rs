@@ -1,3 +1,4 @@
+use crate::bvh::BvhTree;
 use crate::hittable::*;
 use crate::ray::*;
 use crate::vec3::*;
@@ -10,6 +11,7 @@ use std::fs::File;
 use std::io::Write;
 use std::io::{self, BufWriter};
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 pub struct Camera {
     image_height: u64,
@@ -33,6 +35,8 @@ pub struct Camera {
     defocus_disk_u: Vec3,
     defocus_disk_v: Vec3,
     focus_angle: f64,
+
+    rng_src: Arc<Mutex<SmallRng>>,
 }
 
 impl Camera {
@@ -107,6 +111,8 @@ impl Camera {
             defocus_disk_u,
             defocus_disk_v,
             focus_angle,
+
+            rng_src: Arc::new(Mutex::new(SmallRng::from_os_rng())),
         })
     }
 
@@ -124,7 +130,7 @@ impl Camera {
         self.center + (p.x() * self.defocus_disk_u) + (p.y() * self.defocus_disk_v)
     }
 
-    pub fn render(&mut self, world: &HittableList) -> io::Result<()> {
+    pub fn render(&mut self, world: &BvhTree) -> io::Result<()> {
         write!(
             self.out_file,
             "P3\n{} {}\n255\n",
@@ -163,7 +169,7 @@ impl Camera {
         self.out_file.flush()
     }
 
-    fn ray_colour(&self, ray: &Ray, depth: u32, world: &HittableList) -> Colour {
+    fn ray_colour(&self, ray: &Ray, depth: u32, world: &BvhTree) -> Colour {
         if depth <= 0 {
             return Colour::new(0.0, 0.0, 0.0);
         }
@@ -181,8 +187,13 @@ impl Camera {
     }
 
     fn sample_square(&self) -> Vec3 {
-        let mut rng = rand::rng();
-        Vec3::new(rng.random::<f64>() - 0.5, rng.random::<f64>() - 0.5, 0.0)
+        let mut guard = self.rng_src.lock().expect("Poisoned");
+
+        Vec3::new(
+            guard.random::<f64>() - 0.5,
+            guard.random::<f64>() - 0.5,
+            0.0,
+        )
     }
 
     fn make_ray(&self, i: u64, j: u64) -> Ray {
@@ -198,7 +209,11 @@ impl Camera {
             self.defocus_disk_sample()
         };
         let ray_direction = Vec3::from(pixel_sample - ray_origin);
-
-        Ray::new(ray_origin, ray_direction)
+        let ray_time = self
+            .rng_src
+            .lock()
+            .expect("Poisoned RNG source")
+            .random::<f64>();
+        Ray::new(ray_origin, ray_direction, ray_time)
     }
 }
