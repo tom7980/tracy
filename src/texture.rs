@@ -13,7 +13,7 @@ pub struct SolidColour {
 }
 
 impl SolidColour {
-    fn new(a: Colour) -> SolidColour {
+    pub fn new(a: Colour) -> SolidColour {
         SolidColour { colour: a }
     }
 }

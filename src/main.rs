@@ -3,6 +3,7 @@ mod bvh;
 mod camera;
 mod hittable;
 mod material;
+mod quad;
 mod ray;
 mod sphere;
 mod texture;
@@ -18,20 +19,12 @@ use crate::bvh::*;
 use crate::camera::*;
 use crate::hittable::*;
 use crate::material::*;
+use crate::quad::*;
 use crate::ray::*;
 use crate::texture::*;
 use crate::vec3::*;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    let path = &args[1];
-
-    const ASPECT_RATIO: f64 = 16.0 / 9.0;
-    const IMAGE_WIDTH: u64 = 1600;
-
-    let mut world: BvhTree = BvhTree::new();
-
+fn spheres(world: &mut BvhTree) {
     let earth = Arc::new(Lambertian::new(Arc::new(ImageTexture::new("./earth.jpg"))));
     let wood = Arc::new(Lambertian::new(Arc::new(ImageTexture::new("./wood.jpeg"))));
     let noisy = Arc::new(Lambertian::new(Arc::new(NoiseTexture::new())));
@@ -75,20 +68,79 @@ fn main() {
         100.0,
         lambertian.clone(),
     )));
+}
 
-    let center = Point3::new(0.0, 1.5, 3.5);
-    let look_at = Point3::new(0.0, 0.5, -1.0);
+fn quads(world: &mut BvhTree) {
+    let lambertian = Arc::new(Lambertian::new(Arc::new(CheckerTexture::new_with_colours(
+        0.32,
+        Colour::new(0.4, 0.3, 0.2),
+        Colour::new(0.9, 0.9, 0.9),
+    ))));
+
+    let green = Arc::new(Lambertian::new(Arc::new(SolidColour::new(Colour::new(
+        0.1, 1.0, 0.1,
+    )))));
+
+    world.add(Box::new(Quad::new(
+        Point3::new(-3.0, -2.0, 5.0),
+        Vec3::new(0.0, 0.0, -4.0),
+        Vec3::new(0.0, 4.0, 0.0),
+        lambertian.clone(),
+        |_| {},
+    )));
+
+    world.add(Box::new(Quad::new(
+        Point3::new(-2.0, -2.0, 0.0),
+        Vec3::new(4.0, 0.0, 0.0),
+        Vec3::new(0.0, 4.0, 0.0),
+        green.clone(),
+        |x| {
+            println!("{}", x);
+        },
+    )));
+
+    world.add(Box::new(Quad::new(
+        Point3::new(3.0, -2.0, 1.0),
+        Vec3::new(0.0, 0.0, 4.0),
+        Vec3::new(0.0, 4.0, 0.0),
+        lambertian.clone(),
+        |_| {},
+    )));
+
+    world.add(Box::new(Quad::new(
+        Point3::new(-2.0, 3.0, 1.0),
+        Vec3::new(4.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, 4.0),
+        lambertian.clone(),
+        |_| {},
+    )));
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    let path = &args[1];
+
+    const ASPECT_RATIO: f64 = 16.0 / 9.0;
+    const IMAGE_WIDTH: u64 = 400;
+
+    let mut world: BvhTree = BvhTree::new();
+
+    quads(&mut world);
+
+    let center = Point3::new(0.0, 0.0, 9.5);
+    let look_at = Point3::new(0.0, 0.0, 0.0);
     let vup = Vec3::new(0.0, 1.0, 0.0);
 
     if let Ok(mut cam) = Camera::new(
         ASPECT_RATIO,
         IMAGE_WIDTH,
-        30.0,
+        80.0,
         center,
         look_at,
         vup,
         3.5,
-        0.3,
+        0.0,
         path,
     ) {
         cam.set_samples_per_pixel(200);

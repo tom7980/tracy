@@ -269,6 +269,15 @@ impl Point3 {
         self.data.offset(i)
     }
 
+    pub fn modify_axis<F>(&mut self, axis: usize, fun: F)
+    where
+        F: Fn(f64) -> f64,
+    {
+        let current_val = self.data.offset(axis);
+        let updated = fun(current_val);
+        self.data.e[axis] = updated
+    }
+
     pub fn most_minimum(&self, other: Point3) -> Point3 {
         let x = if self.offset(0) <= other.offset(0) {
             self.offset(0)

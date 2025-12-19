@@ -50,7 +50,11 @@ impl BoundingBox {
         let upper = Point3::new(upper_x, upper_y, upper_z);
         let lower = Point3::new(lower_x, lower_y, lower_z);
 
-        BoundingBox { lower, upper }
+        let mut out = BoundingBox { lower, upper };
+
+        out.pad_minimum();
+
+        out
     }
 
     pub fn empty() -> BoundingBox {
@@ -75,6 +79,16 @@ impl BoundingBox {
             idx
         } else {
             0
+        }
+    }
+
+    fn pad_minimum(&mut self) {
+        const PADDING: f64 = 0.0001;
+        for axis in 0..3 {
+            if self.axis_length(axis) < PADDING {
+                self.upper.modify_axis(axis, |val| val + PADDING / 2.0);
+                self.lower.modify_axis(axis, |val| val - PADDING / 2.0);
+            }
         }
     }
 
