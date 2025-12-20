@@ -23,6 +23,10 @@ impl ScatterRecord {
 
 pub trait Material: Send + Sync {
     fn scatter(&self, ray: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord>;
+
+    fn emit(&self, u: f64, v: f64, p: &Point3) -> Option<Colour> {
+        None
+    }
 }
 
 pub struct Lambertian {
@@ -122,5 +126,31 @@ impl Material for Dielectric {
             attenuation: self.albedo,
             scattered: Ray::new(hit_record.hit_pos(), direction, ray.time()),
         })
+    }
+}
+
+pub struct DiffuseLight {
+    texture: Arc<dyn Texture>,
+}
+
+impl DiffuseLight {
+    pub fn new(texture: Arc<dyn Texture>) -> DiffuseLight {
+        DiffuseLight { texture }
+    }
+
+    pub fn from_colour(colour: Colour) -> DiffuseLight {
+        DiffuseLight {
+            texture: Arc::new(SolidColour::new(colour)),
+        }
+    }
+}
+
+impl Material for DiffuseLight {
+    fn scatter(&self, ray: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
+        None
+    }
+
+    fn emit(&self, u: f64, v: f64, p: &Point3) -> Option<Colour> {
+        Some(self.texture.value(u, v, *p))
     }
 }

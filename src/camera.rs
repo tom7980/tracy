@@ -37,6 +37,7 @@ pub struct Camera {
     focus_angle: f64,
 
     rng_src: Arc<Mutex<SmallRng>>,
+    background: Colour,
 }
 
 impl Camera {
@@ -113,6 +114,7 @@ impl Camera {
             focus_angle,
 
             rng_src: Arc::new(Mutex::new(SmallRng::from_os_rng())),
+            background: Colour::new(0.0, 0.0, 0.0),
         })
     }
 
@@ -175,15 +177,25 @@ impl Camera {
         }
 
         if let Some(record) = world.hit(ray, 0.001, f64::INFINITY) {
+            let emitted = record
+                .material_ref()
+                .emit(record.u, record.v, &record.hit_pos())
+                .unwrap_or(Colour::new(0.0, 0.0, 0.0));
+
             if let Some(scatter) = record.material_ref().scatter(ray, &record) {
                 return Colour::from(self.ray_colour(scatter.scattered_ref(), depth - 1, world))
-                    * scatter.attenuation();
+                    * scatter.attenuation()
+                    + emitted;
+            } else {
+                return emitted;
             }
         }
 
-        let direction = unit_vector(ray.direction());
-        let scale = 0.5 * (direction.y() + 1.0);
-        (1.0 - scale) * Colour::new(1.0, 1.0, 1.0) + scale * Colour::new(0.5, 0.7, 1.0)
+        self.background
+
+        // let direction = unit_vector(ray.direction());
+        // let scale = 0.5 * (direction.y() + 1.0);
+        // (1.0 - scale) * Colour::new(1.0, 1.0, 1.0) + scale * Colour::new(0.5, 0.7, 1.0)
     }
 
     fn sample_square(&self) -> Vec3 {
