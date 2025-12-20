@@ -136,9 +136,9 @@ fn light(world: &mut BvhTree) {
     let light = Arc::new(DiffuseLight::from_colour(Colour::new(5.0, 5.0, 5.0)));
 
     world.add(Box::new(Quad::new(
-        Point3::new(2.0, -1.0, -2.0),
-        Vec3::new(0.0, 0.0, -2.0),
-        Vec3::new(0.0, 2.0, 2.0),
+        Point3::new(-2.0, 2.0, -5.0),
+        Vec3::new(4.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, 4.0),
         light.clone(),
         |_| {},
     )));
