@@ -25,7 +25,7 @@ impl Vec3 {
         self.e[2]
     }
 
-    pub fn offset(&self, x: usize) -> f64 {
+    pub fn axis(&self, x: usize) -> f64 {
         self.e[x]
     }
 
@@ -205,6 +205,12 @@ impl AddAssign for Vec3 {
     }
 }
 
+impl AddAssign<Vec3> for Point3 {
+    fn add_assign(&mut self, rhs: Vec3) {
+        self.data = self.data + rhs;
+    }
+}
+
 // Vec3 *= f64
 impl MulAssign<f64> for Vec3 {
     fn mul_assign(&mut self, t: f64) {
@@ -265,34 +271,34 @@ impl Point3 {
         }
     }
 
-    pub fn offset(&self, i: usize) -> f64 {
-        self.data.offset(i)
+    pub fn axis(&self, i: usize) -> f64 {
+        self.data.axis(i)
     }
 
     pub fn modify_axis<F>(&mut self, axis: usize, fun: F)
     where
         F: Fn(f64) -> f64,
     {
-        let current_val = self.data.offset(axis);
+        let current_val = self.data.axis(axis);
         let updated = fun(current_val);
         self.data.e[axis] = updated
     }
 
     pub fn most_minimum(&self, other: Point3) -> Point3 {
-        let x = if self.offset(0) <= other.offset(0) {
-            self.offset(0)
+        let x = if self.axis(0) <= other.axis(0) {
+            self.axis(0)
         } else {
-            other.offset(0)
+            other.axis(0)
         };
-        let y = if self.offset(1) <= other.offset(1) {
-            self.offset(1)
+        let y = if self.axis(1) <= other.axis(1) {
+            self.axis(1)
         } else {
-            other.offset(1)
+            other.axis(1)
         };
-        let z = if self.offset(2) <= other.offset(2) {
-            self.offset(2)
+        let z = if self.axis(2) <= other.axis(2) {
+            self.axis(2)
         } else {
-            other.offset(2)
+            other.axis(2)
         };
 
         Point3 {
@@ -301,20 +307,20 @@ impl Point3 {
     }
 
     pub fn most_maximum(&self, other: Point3) -> Point3 {
-        let x = if self.offset(0) >= other.offset(0) {
-            self.offset(0)
+        let x = if self.axis(0) >= other.axis(0) {
+            self.axis(0)
         } else {
-            other.offset(0)
+            other.axis(0)
         };
-        let y = if self.offset(1) >= other.offset(1) {
-            self.offset(1)
+        let y = if self.axis(1) >= other.axis(1) {
+            self.axis(1)
         } else {
-            other.offset(1)
+            other.axis(1)
         };
-        let z = if self.offset(2) >= other.offset(2) {
-            self.offset(2)
+        let z = if self.axis(2) >= other.axis(2) {
+            self.axis(2)
         } else {
-            other.offset(2)
+            other.axis(2)
         };
 
         Point3 {
@@ -445,6 +451,14 @@ impl Mul for Colour {
 
     fn mul(self, other: Colour) -> Colour {
         Colour::from(self.data * other.data)
+    }
+}
+
+impl Div<f64> for Colour {
+    type Output = Colour;
+
+    fn div(self, rhs: f64) -> Self::Output {
+        Colour::from(self.data / rhs)
     }
 }
 

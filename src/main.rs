@@ -174,6 +174,72 @@ fn light(world: &mut BvhTree) {
     )));
 }
 
+fn boxes(world: &mut BvhTree) {
+    let red = Lambertian::as_arc(SolidColour::as_arc_from_rgb(0.65, 0.05, 0.05));
+    let white = Lambertian::as_arc(SolidColour::as_arc_from_rgb(0.73, 0.73, 0.73));
+    let green = Lambertian::as_arc(SolidColour::as_arc_from_rgb(0.12, 0.45, 0.15));
+    let light = DiffuseLight::as_arc_from_colour(Colour::new(15.0, 15.0, 15.0));
+
+    world.add(Quad::boxed(
+        Point3::new(555.0, 0.0, 0.0),
+        Vec3::new(0.0, 555.0, 0.0),
+        Vec3::new(0.0, 0.0, 555.0),
+        green.clone(),
+        |_| {},
+    ));
+    world.add(Quad::boxed(
+        Point3::new(0.0, 0.0, 0.0),
+        Vec3::new(0.0, 555.0, 0.0),
+        Vec3::new(0.0, 0.0, 555.0),
+        red.clone(),
+        |_| {},
+    ));
+    world.add(Quad::boxed(
+        Point3::new(343.0, 554.0, 332.0),
+        Vec3::new(-130.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, -105.0),
+        light.clone(),
+        |_| {},
+    ));
+    world.add(Quad::boxed(
+        Point3::new(0.0, 0.0, 0.0),
+        Vec3::new(555.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, 555.0),
+        white.clone(),
+        |_| {},
+    ));
+    world.add(Quad::boxed(
+        Point3::new(555.0, 555.0, 555.0),
+        Vec3::new(-555.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, -555.0),
+        white.clone(),
+        |_| {},
+    ));
+    world.add(Quad::boxed(
+        Point3::new(0.0, 0.0, 555.0),
+        Vec3::new(555.0, 0.0, 0.0),
+        Vec3::new(0.0, 555.0, 0.0),
+        white.clone(),
+        |_| {},
+    ));
+
+    let cube1 = Cube::boxed(
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(165.0, 330.0, 165.0),
+        white.clone(),
+    );
+    let rotate1 = RotateY::boxed(cube1, 15.0);
+    world.add(Translate::boxed(rotate1, &Vec3::new(265.0, 0.0, 295.0)));
+
+    let cube2 = Cube::boxed(
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(165.0, 165.0, 165.0),
+        white.clone(),
+    );
+    let rotate2 = RotateY::boxed(cube2, -18.0);
+    world.add(Translate::boxed(rotate2, &Vec3::new(130.0, 0.0, 65.0)));
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -184,16 +250,16 @@ fn main() {
 
     let mut world: BvhTree = BvhTree::new();
 
-    light(&mut world);
+    boxes(&mut world);
 
-    let center = Point3::new(0.0, 1.0, 1.0);
-    let look_at = Point3::new(0.0, 0.5, 0.0);
+    let center = Point3::new(278.0, 278.0, -800.0);
+    let look_at = Point3::new(278.0, 278.0, 0.0);
     let vup = Vec3::new(0.0, 1.0, 0.0);
 
     if let Ok(mut cam) = Camera::new(
         ASPECT_RATIO,
         IMAGE_WIDTH,
-        80.0,
+        40.0,
         center,
         look_at,
         vup,
@@ -201,8 +267,8 @@ fn main() {
         0.0,
         path,
     ) {
-        cam.set_samples_per_pixel(200);
-        cam.set_max_depth(100);
+        cam.set_samples_per_pixel(2000);
+        cam.set_max_depth(50);
         cam.render(&world).unwrap_or_else(|err| {
             eprintln!("Problem Rendering image: {err}");
         });

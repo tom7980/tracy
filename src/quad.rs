@@ -52,6 +52,10 @@ impl<F: Fn(String)> Quad<F> {
         }
     }
 
+    pub fn boxed(q: Point3, u: Vec3, v: Vec3, mat: Arc<dyn Material>, f: F) -> Box<Quad<F>> {
+        Box::new(Quad::new(q, u, v, mat, f))
+    }
+
     pub fn is_interior(&self, a: &f64, b: &f64) -> Option<(f64, f64)> {
         let range: Range<f64> = 0.0..1.0;
 
@@ -96,5 +100,81 @@ impl<F: Fn(String) + Send + Sync> Hittable for Quad<F> {
 
     fn bounding_box(&self) -> &BoundingBox {
         &self.bounds
+    }
+}
+
+pub struct Cube {
+    sides: Box<HittableList>,
+}
+
+impl Cube {
+    pub fn new(a: Point3, b: Point3, mat: Arc<dyn Material>) -> Cube {
+        let mut sides = Box::new(HittableList::new());
+
+        let min = a.most_minimum(b);
+        let max = a.most_maximum(b);
+
+        let dx = Vec3::new(max.axis(0) - min.axis(0), 0.0, 0.0);
+        let dy = Vec3::new(0.0, max.axis(1) - min.axis(1), 0.0);
+        let dz = Vec3::new(0.0, 0.0, max.axis(2) - min.axis(2));
+
+        sides.add(Quad::boxed(
+            Point3::new(min.axis(0), min.axis(1), max.axis(2)),
+            dx,
+            dy,
+            mat.clone(),
+            |_| {},
+        ));
+        sides.add(Quad::boxed(
+            Point3::new(max.axis(0), min.axis(1), max.axis(2)),
+            -dz,
+            dy,
+            mat.clone(),
+            |_| {},
+        ));
+        sides.add(Quad::boxed(
+            Point3::new(max.axis(0), min.axis(1), min.axis(2)),
+            -dx,
+            dy,
+            mat.clone(),
+            |_| {},
+        ));
+        sides.add(Quad::boxed(
+            Point3::new(min.axis(0), min.axis(1), min.axis(2)),
+            dz,
+            dy,
+            mat.clone(),
+            |_| {},
+        ));
+        sides.add(Quad::boxed(
+            Point3::new(min.axis(0), max.axis(1), max.axis(2)),
+            dx,
+            -dz,
+            mat.clone(),
+            |_| {},
+        ));
+        sides.add(Quad::boxed(
+            Point3::new(min.axis(0), min.axis(1), min.axis(2)),
+            dx,
+            dz,
+            mat.clone(),
+            |_| {},
+        ));
+
+        Cube { sides }
+    }
+
+    pub fn boxed(a: Point3, b: Point3, mat: Arc<dyn Material>) -> Box<Cube> {
+        Box::new(Cube::new(a, b, mat))
+    }
+}
+
+impl Hittable for Cube {
+    fn hit(&self, r: &Ray, ray_tmin: f64, ray_tmax: f64) -> Option<HitRecord> {
+        self.sides.hit(r, ray_tmin, ray_tmax)
+    }
+
+    fn bounding_box(&self) -> &BoundingBox {
+        self.sides.bounding_box()
     }
 }

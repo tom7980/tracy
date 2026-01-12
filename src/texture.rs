@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::Arc;
 
 use crate::vec3::*;
 use image::{open, ImageBuffer, RgbImage};
@@ -15,6 +16,16 @@ pub struct SolidColour {
 impl SolidColour {
     pub fn new(a: Colour) -> SolidColour {
         SolidColour { colour: a }
+    }
+
+    pub fn as_arc(a: Colour) -> Arc<SolidColour> {
+        Arc::new(SolidColour { colour: a })
+    }
+
+    pub fn as_arc_from_rgb(r: f64, g: f64, b: f64) -> Arc<SolidColour> {
+        Arc::new(SolidColour {
+            colour: Colour::new(r, g, b),
+        })
     }
 }
 
@@ -42,9 +53,9 @@ impl CheckerTexture {
 
 impl Texture for CheckerTexture {
     fn value(&self, u: f64, v: f64, p: Point3) -> Colour {
-        let xint = f64::floor(p.offset(0) * self.scale) as i32;
-        let yint = f64::floor(p.offset(1) * self.scale) as i32;
-        let zint = f64::floor(p.offset(2) * self.scale) as i32;
+        let xint = f64::floor(p.axis(0) * self.scale) as i32;
+        let yint = f64::floor(p.axis(1) * self.scale) as i32;
+        let zint = f64::floor(p.axis(2) * self.scale) as i32;
 
         let is_even = (xint + yint + zint).rem_euclid(2) == 0;
 

@@ -1,4 +1,6 @@
 use core::f64;
+use std::f64::{INFINITY, NEG_INFINITY};
+use std::ops::{Add, AddAssign};
 
 use crate::ray::*;
 use crate::vec3::*;
@@ -16,35 +18,35 @@ pub struct IntersectionRecord {
 
 impl BoundingBox {
     pub fn new(a: Point3, b: Point3) -> BoundingBox {
-        let upper_x = if a.offset(0) > b.offset(0) {
-            a.offset(0)
+        let upper_x = if a.axis(0) > b.axis(0) {
+            a.axis(0)
         } else {
-            b.offset(0)
+            b.axis(0)
         };
-        let upper_y = if a.offset(1) > b.offset(1) {
-            a.offset(1)
+        let upper_y = if a.axis(1) > b.axis(1) {
+            a.axis(1)
         } else {
-            b.offset(1)
+            b.axis(1)
         };
-        let upper_z = if a.offset(2) > b.offset(2) {
-            a.offset(2)
+        let upper_z = if a.axis(2) > b.axis(2) {
+            a.axis(2)
         } else {
-            b.offset(2)
+            b.axis(2)
         };
-        let lower_x = if a.offset(0) < b.offset(0) {
-            a.offset(0)
+        let lower_x = if a.axis(0) < b.axis(0) {
+            a.axis(0)
         } else {
-            b.offset(0)
+            b.axis(0)
         };
-        let lower_y = if a.offset(1) < b.offset(1) {
-            a.offset(1)
+        let lower_y = if a.axis(1) < b.axis(1) {
+            a.axis(1)
         } else {
-            b.offset(1)
+            b.axis(1)
         };
-        let lower_z = if a.offset(2) < b.offset(2) {
-            a.offset(2)
+        let lower_z = if a.axis(2) < b.axis(2) {
+            a.axis(2)
         } else {
-            b.offset(2)
+            b.axis(2)
         };
 
         let upper = Point3::new(upper_x, upper_y, upper_z);
@@ -93,8 +95,8 @@ impl BoundingBox {
     }
 
     pub fn axis_length(&self, axis: usize) -> f64 {
-        let lower = self.lower.offset(axis);
-        let upper = self.upper.offset(axis);
+        let lower = self.lower.axis(axis);
+        let upper = self.upper.axis(axis);
 
         f64::abs(upper - lower)
     }
@@ -106,6 +108,36 @@ impl BoundingBox {
         BoundingBox { lower, upper }
     }
 
+    pub fn rotate_y(&self, cos_theta: f64, sin_theta: f64) -> BoundingBox {
+        let mut min = Point3::new(INFINITY, INFINITY, INFINITY);
+        let mut max = Point3::new(NEG_INFINITY, NEG_INFINITY, NEG_INFINITY);
+
+        for i in 0..2 {
+            for j in 0..2 {
+                for k in 0..2 {
+                    let x = self.upper.axis(0) * i as f64 + self.lower.axis(0) * (1.0 - i as f64);
+                    let y = self.upper.axis(1) * j as f64 + self.lower.axis(1) * (1.0 - j as f64);
+                    let z = self.upper.axis(2) * k as f64 + self.lower.axis(2) * (1.0 - k as f64);
+
+                    let newx = cos_theta * x + sin_theta * z;
+                    let newz = -sin_theta * x + cos_theta * z;
+
+                    let test = Vec3::new(newx, y, newz);
+
+                    for c in 0..3 {
+                        min.modify_axis(c, |val| f64::min(val, test.axis(c)));
+                        max.modify_axis(c, |val| f64::max(val, test.axis(c)));
+                    }
+                }
+            }
+        }
+
+        BoundingBox {
+            lower: min,
+            upper: max,
+        }
+    }
+
     pub fn intersects(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<IntersectionRecord> {
         let origin = ray.origin();
         let direction = ray.direction();
@@ -114,13 +146,13 @@ impl BoundingBox {
         let mut tmax_out = t_max;
 
         for axis in 0..3 {
-            let ax_min = self.lower.offset(axis);
-            let ax_max = self.upper.offset(axis);
+            let ax_min = self.lower.axis(axis);
+            let ax_max = self.upper.axis(axis);
 
-            let adinv = 1.0 / direction.offset(axis);
+            let adinv = 1.0 / direction.axis(axis);
 
-            let t0 = (ax_min - origin.offset(axis)) * adinv;
-            let t1 = (ax_max - origin.offset(axis)) * adinv;
+            let t0 = (ax_min - origin.axis(axis)) * adinv;
+            let t1 = (ax_max - origin.axis(axis)) * adinv;
 
             if t0 < t1 {
                 if t0 > t_min {
@@ -147,5 +179,63 @@ impl BoundingBox {
             tmin: tmin_out,
             tmax: tmax_out,
         })
+    }
+}
+
+impl Add for BoundingBox {
+    type Output = BoundingBox;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        BoundingBox {
+            lower: self.lower + rhs.lower,
+            upper: self.upper + rhs.upper,
+        }
+    }
+}
+
+impl AddAssign for BoundingBox {
+    fn add_assign(&mut self, rhs: Self) {
+        self.upper = self.upper + rhs.upper;
+        self.lower = self.lower + rhs.lower;
+    }
+}
+
+impl Add<Vec3> for BoundingBox {
+    type Output = BoundingBox;
+
+    fn add(self, rhs: Vec3) -> Self::Output {
+        BoundingBox {
+            lower: self.lower + rhs,
+            upper: self.upper + rhs,
+        }
+    }
+}
+
+impl Add<&Vec3> for &BoundingBox {
+    type Output = BoundingBox;
+
+    fn add(self, rhs: &Vec3) -> Self::Output {
+        BoundingBox {
+            upper: self.upper + *rhs,
+            lower: self.lower + *rhs,
+        }
+    }
+}
+
+impl AddAssign<Vec3> for BoundingBox {
+    fn add_assign(&mut self, rhs: Vec3) {
+        self.lower = self.lower + rhs;
+        self.upper = self.upper + rhs;
+    }
+}
+
+impl Add<BoundingBox> for Vec3 {
+    type Output = BoundingBox;
+
+    fn add(self, rhs: BoundingBox) -> Self::Output {
+        BoundingBox {
+            lower: rhs.lower + self,
+            upper: rhs.upper + self,
+        }
     }
 }

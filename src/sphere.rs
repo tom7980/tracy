@@ -33,8 +33,8 @@ impl Sphere {
     }
 
     pub fn get_sphere_uv(&self, p: &Point3) -> (f64, f64) {
-        let theta = f64::acos(-p.offset(1));
-        let phi = f64::atan2(-p.offset(2), p.offset(0)) + f64::consts::PI;
+        let theta = f64::acos(-p.axis(1));
+        let phi = f64::atan2(-p.axis(2), p.axis(0)) + f64::consts::PI;
 
         (phi / (2.0 * f64::consts::PI), theta / f64::consts::PI)
     }

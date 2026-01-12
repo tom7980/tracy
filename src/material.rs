@@ -1,4 +1,5 @@
 use crate::{hittable::*, ray::*, texture::*, vec3::*};
+use core::f64;
 use rand::Rng;
 use std::sync::Arc;
 
@@ -27,6 +28,10 @@ pub trait Material: Send + Sync {
     fn emit(&self, u: f64, v: f64, p: &Point3) -> Option<Colour> {
         None
     }
+
+    fn scatter_pdf(&self, ray: &Ray, hit_record: &HitRecord, scatter_ray: &Ray) -> f64 {
+        0.0
+    }
 }
 
 pub struct Lambertian {
@@ -36,6 +41,10 @@ pub struct Lambertian {
 impl Lambertian {
     pub fn new(albedo: Arc<dyn Texture>) -> Lambertian {
         Lambertian { albedo }
+    }
+
+    pub fn as_arc(albedo: Arc<dyn Texture>) -> Arc<Lambertian> {
+        Arc::new(Lambertian { albedo })
     }
 }
 
@@ -52,6 +61,15 @@ impl Material for Lambertian {
             scattered: Ray::new(hit_record.hit_pos(), scatter_direction, ray.time()),
         })
     }
+
+    fn scatter_pdf(&self, ray: &Ray, hit_record: &HitRecord, scatter_ray: &Ray) -> f64 {
+        let cos_theta = dot(hit_record.normal(), unit_vector(scatter_ray.direction()));
+        if cos_theta < 0.0 {
+            0.0
+        } else {
+            cos_theta / f64::consts::PI
+        }
+    }
 }
 
 pub struct Metalic {
@@ -65,6 +83,13 @@ impl Metalic {
             albedo,
             fuzz: fuzz.clamp(0.0, 1.0),
         }
+    }
+
+    pub fn as_arc(albedo: Colour, fuzz: f64) -> Arc<Metalic> {
+        Arc::new(Metalic {
+            albedo,
+            fuzz: fuzz.clamp(0.0, 1.0),
+        })
     }
 }
 
@@ -91,6 +116,13 @@ impl Dielectric {
             refractive_index,
             albedo,
         }
+    }
+
+    pub fn as_arc(refractive_index: f64, albedo: Colour) -> Arc<Dielectric> {
+        Arc::new(Dielectric {
+            refractive_index,
+            albedo,
+        })
     }
 
     fn reflectance(&self, cosine: f64) -> f64 {
@@ -142,6 +174,12 @@ impl DiffuseLight {
         DiffuseLight {
             texture: Arc::new(SolidColour::new(colour)),
         }
+    }
+
+    pub fn as_arc_from_colour(colour: Colour) -> Arc<DiffuseLight> {
+        Arc::new(DiffuseLight {
+            texture: SolidColour::as_arc(colour),
+        })
     }
 }
 

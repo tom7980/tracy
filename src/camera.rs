@@ -183,9 +183,19 @@ impl Camera {
                 .unwrap_or(Colour::new(0.0, 0.0, 0.0));
 
             if let Some(scatter) = record.material_ref().scatter(ray, &record) {
-                return Colour::from(self.ray_colour(scatter.scattered_ref(), depth - 1, world))
-                    * scatter.attenuation()
-                    + emitted;
+                let scatter_pdf =
+                    record
+                        .material_ref()
+                        .scatter_pdf(ray, &record, scatter.scattered_ref());
+                let pdf_val = scatter_pdf;
+
+                let scatter_colour =
+                    (Colour::from(self.ray_colour(scatter.scattered_ref(), depth - 1, world))
+                        * scatter.attenuation()
+                        * scatter_pdf)
+                        / pdf_val;
+
+                return scatter_colour + emitted;
             } else {
                 return emitted;
             }

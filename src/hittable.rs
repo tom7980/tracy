@@ -3,6 +3,7 @@ use crate::material;
 use crate::material::Material;
 use crate::ray::*;
 use crate::vec3::*;
+use core::f64;
 use std::sync::Arc;
 
 pub struct HitRecord {
@@ -110,4 +111,113 @@ pub trait Hittable: Send + Sync {
     fn hit(&self, r: &Ray, ray_tmin: f64, ray_tmax: f64) -> Option<HitRecord>;
 
     fn bounding_box(&self) -> &BoundingBox;
+}
+
+pub struct Translate {
+    object: Box<dyn Hittable>,
+    bounds: BoundingBox,
+    offset: Vec3,
+}
+
+impl Translate {
+    pub fn new(object: Box<dyn Hittable>, offset: &Vec3) -> Translate {
+        let bounds = object.bounding_box() + offset;
+
+        Translate {
+            object,
+            bounds,
+            offset: *offset,
+        }
+    }
+
+    pub fn boxed(object: Box<dyn Hittable>, offset: &Vec3) -> Box<Translate> {
+        Box::new(Translate::new(object, offset))
+    }
+}
+
+impl Hittable for Translate {
+    fn bounding_box(&self) -> &BoundingBox {
+        &self.bounds
+    }
+
+    fn hit(&self, r: &Ray, ray_tmin: f64, ray_tmax: f64) -> Option<HitRecord> {
+        let offset_r = Ray::new(r.origin() - self.offset, r.direction(), r.time());
+
+        if let Some(mut hit) = self.object.hit(&offset_r, ray_tmin, ray_tmax) {
+            hit.p += self.offset;
+            return Some(hit);
+        } else {
+            None
+        }
+    }
+}
+
+pub struct RotateY {
+    cos_theta: f64,
+    sin_theta: f64,
+    object: Box<dyn Hittable>,
+    bounds: BoundingBox,
+}
+
+impl RotateY {
+    pub fn new(object: Box<dyn Hittable>, angle: f64) -> RotateY {
+        let radians = angle.to_radians();
+        let cos_theta = f64::cos(radians);
+        let sin_theta = f64::sin(radians);
+
+        let obj_box = object.bounding_box();
+
+        let bounds = obj_box.rotate_y(cos_theta, sin_theta);
+
+        RotateY {
+            cos_theta,
+            sin_theta,
+            object,
+            bounds,
+        }
+    }
+
+    pub fn boxed(object: Box<dyn Hittable>, angle: f64) -> Box<RotateY> {
+        Box::new(RotateY::new(object, angle))
+    }
+}
+
+impl Hittable for RotateY {
+    fn bounding_box(&self) -> &BoundingBox {
+        &self.bounds
+    }
+
+    fn hit(&self, r: &Ray, ray_tmin: f64, ray_tmax: f64) -> Option<HitRecord> {
+        let origin = Point3::new(
+            (self.cos_theta * r.origin().axis(0)) - (self.sin_theta * r.origin().axis(2)),
+            r.origin().axis(1),
+            (self.sin_theta * r.origin().axis(0)) + (self.cos_theta * r.origin().axis(2)),
+        );
+
+        let direction = Vec3::new(
+            (self.cos_theta * r.direction().x()) - (self.sin_theta * r.direction().z()),
+            r.direction().y(),
+            (self.sin_theta * r.direction().x()) + (self.cos_theta * r.direction().z()),
+        );
+
+        let rotated_r = Ray::new(origin, direction, r.time());
+
+        if let Some(mut hit) = self.object.hit(&rotated_r, ray_tmin, ray_tmax) {
+            hit.p = Point3::new(
+                (self.cos_theta * hit.p.axis(0)) + (self.sin_theta * hit.p.axis(2)),
+                hit.p.axis(1),
+                (-self.sin_theta * hit.p.axis(0)) + (self.cos_theta * hit.p.axis(2)),
+            );
+
+            hit.normal = Vec3::new(
+                (self.cos_theta * hit.normal.axis(0)) + (self.sin_theta * hit.normal.axis(2)),
+                hit.normal.axis(1),
+                (-self.sin_theta * hit.normal.axis(0)) + (self.cos_theta * hit.normal.axis(2)),
+            );
+
+            return Some(hit);
+        } else {
+            None
+        }
+    }
 }
