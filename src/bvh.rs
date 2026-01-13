@@ -135,7 +135,6 @@ impl BvhSlab {
         let mut bbox = BoundingBox::empty();
         list.iter().for_each(|obj| {
             bbox = BoundingBox::box_between(&bbox, obj.bounding_box());
-            println!("{:?}", bbox);
         });
 
         let axis = bbox.longest_axis();

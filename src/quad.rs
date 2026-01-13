@@ -31,8 +31,6 @@ impl<F: Fn(String)> Quad<F> {
 
         let full_bounds = BoundingBox::box_between(&bound1, &bound2);
 
-        println!("Quad Bounds {:?}", full_bounds);
-
         let n = cross(u, v);
         let normal = unit_vector(n);
 

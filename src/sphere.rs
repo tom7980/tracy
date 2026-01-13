@@ -23,7 +23,6 @@ impl Sphere {
 
         let movement_bounds = BoundingBox::box_between(&box1, &box2);
 
-        println!("Bounds of Sphere: {:?}", movement_bounds);
         Sphere {
             movement,
             radius,
